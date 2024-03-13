@@ -1,0 +1,113 @@
+Introduction
+
+This is an optional case study concluding the Google Data Analytics Professional Certificate. The goal is to complete an analysis for Bellabeat, a high-tech manufacturer of health-focused products for women and seek new growth opportunities for their smart devices. The dataset is available on Kaggel at https://www.kaggle.com/datasets/arashnic/fitbit and includes 18 data files. To fully answer their business questions I followed the steps of the data analysis process: ask, prepare, process, analyze, share and act.
+
+Ask:
+What are some trends in smart device usage?
+How can these trends apply to Bellabeat customers?
+How can these insights drive business decisions?
+
+Prepare:
+The datasets were made available through CC0: Public Domain, dataset made available through Mobius. Thirty eligible Fitbit users consented to the submission of
+personal tracker data, including minute-level output for physical activity, heart rate, and sleep monitoring. It includes information about daily activity, steps, and heart rate that can be used to explore users’ habits. To determine the credibility of the information, I referred to the ROCC method discussed in the course:
+Reliable: The information is not very reliable due to the population given. Only having 30 respondents total and then 24 in the sleep study leads to a small sample size. 
+Original: The information is 3rd-Party data and comes from respondents to a distributed survey via Amazon Mechanical Turk
+Comprehensive: The datasets do cover the primary areas of interest to determine some trends that can be applied to business decisions. 
+Current: The data is from April & May of 2016 and is very outdated by the time of this analysis. 
+Cited: As the information was made available via Kaggle, the set could be considered unreliable and wouldn’t be recommended to produce business decisions. 
+
+
+Process:
+The data can be downloaded as a CSV file and handled in multiple ways. In order to practice with multiple tools we learned and my prior experience, I first cleaned the data in Google Sheets, merged the manipulated data together in SQL and visualized charts & this webpage with RStudio. 
+
+Analyze:
+Each step of the cleaning process gave further insight to how the data was obtained, its limitations and what is the best course of action to improve the product usage:
+
+Starting with Google Sheets, I identified what information was being stored on each file in order to find linking primary keys, checked formatting to ensure that elements could be compared consistently, for any missing data and duplicates that may skew our results. Using the Conditional Formatting feature, I was able to see there were 543 duplicates from the Minute Sleep dataset which I would later use to determine activity levels by time of day. I also updated the date format to align with other datasets to keep uniformity and discovered that the “Hourly” datasets were rounded when compared with summing the “Minute” datasets.
+
+Moving onto SQL, I merged a few newly cleaned datasets to make visualizing in R more simple. I combined with a simple left join to get Total Steps vs Calories (dailySteps_merged & dailyCalories_merged) and Sedentary time vs Sleep duration (sleepDay_merged & dailyIntensities_merged). The final SQL query I used was to determine Intensity vs Sleep Time that utilized reformatting, multiple cases, an inner join and ordering to see if  there was an overlap when users were asleep to certain intensity levels and if there was some data being missed when switching from minutes to hours in the daily datasets. 
+
+Select 
+MS.ID as User,
+format_datetime('%H:%M', MS.Sleep_Time) as Time1,
+format_datetime('%H:%M', MINT.ActivityMinute) as Time2,
+CASE
+  WHEN MS.value = 1 then 'Asleep'
+  Else 'Awake'
+End as SleepValue,
+CASE
+  When MINT.Intensity = 0 then 'Sedentary'
+  When MINT.Intensity = 1 then 'Lightly Active'
+  When MINT.Intensity = 2 then 'Fairly Active'
+  When MINT.Intensity = 3 then 'Very Active'
+End as IntensityValue,
+
+from 
+bellabeatcasestudy2-24.Bellabeat.MinuteSleep as MS
+inner join bellabeatcasestudy2-24.Bellabeat.MinuteIntensitiesNarrow as MINT
+on MS.Id = MINT.Id and format_datetime('%H:%M', MS.Sleep_Time) = format_datetime('%H:%M', MINT.ActivityMinute)
+
+Where 1=1
+and MS.Id in (1503960366, 16444300816, 2320127002, 2347167796, 3977333714, 4020332650, 4319703577, 4388161847, 4445114986, 4558609924, 4702921684, 5553957443, 5577150313, 6117666160, 6775888955, 6962181067, 7007744171, 7086361926, 8053475328, 8378563200, 8792009665)
+
+order by 
+Time1, Time2, User, SleepValue, IntensityValue
+
+In RStudio, I took the merged data to create multiple graphs seen below and create a host page using RMarkdown. In order to make the Activity Time of Day bar chart less complicated, I used a formatting feature to group the times by half hour and added subplots and dropdown menus. 
+
+Share:
+Based on the cleaned data and analysis above, I was able to create the following visuals to determine the trends in an easy to follow manner. Starting with Sedentary vs Sleep Duration (stacked bar) I looked to see how long useres were sleeping and also checked to see if there was any unusual amounts of activity to verify data reliability. Based on the chart below we can see that some users were "fairly active" at some points during their sleep that we don't want any solutions to simply go off activity intensity, but factor in time of day as well.
+
+library(plotly)
+library(dplyr)
+
+filtered_data <- Sedentary_vs_Sleep_Duration %>%
+  filter(!is.na(TotalMinutesAsleep)
+
+filtered_data$Sequential_Id <- seq_along(filtered_data$Id)
+
+plot <- filtered_data %>%
+  plot_ly(x = ~Sequential_Id, y = ~SedentaryMinutes, type = 'bar', name = 'Sedentary Minutes') %>%
+  add_trace(y = ~TotalMinutesAsleep, name = 'Total Minutes Asleep') %>%
+  layout(title = "Sedentary Minutes vs Total Minutes Asleep",
+         xaxis = list(title = "Id’s in sequential order"),
+         yaxis = list(title = "Total Minutes"))
+
+The next chart to explore was a bar chart determining when users were most active throughout the day. This would give insights to see if there is a specific peak time most users choose or if there are several times to expect excersise. 
+Hourly Chart
+Plotly & dplyr
+
+> HourlyIntensities_24$ActivityHour <- as.POSIXct(HourlyIntensities_24$ActivityHour, format = "%m/%d/%Y %H:%M:%S")
+> HourlyIntensities_24$Hour <- format(HourlyIntensities_24$ActivityHour, "%H")
+> hourly_sum <- HourlyIntensities_24 %>%
+     group_by(Hour) %>%
+     summarise(Total_Product = sum(TotalIntensity * AverageIntensity))
+> plot_ly(hourly_sum, x = ~Hour, y = ~Total_Product, type = 'bar', 
+         marker = list(color = '#1976D2')) %>%
+     layout(title = 'Exercise by Hour of the Day',
+            xaxis = list(title = 'Hour'),
+            yaxis = list(title = 'Sum of Intensities'))
+
+
+
+Act:
+Recalling back to the original questions proposed:
+What are some trends in smart device usage?
+
+Based on the chart for Horuly Intensities, we are able to determine that the users are most active after meal times with dinner being the most prevalent. We can also see there is some fairly light activity while users were asleep, but should not be acted on since the customers will be unresponsive during that time.
+
+How can these trends apply to Bellabeat customers?
+
+Based on the CDC (Centers for Disease Control and Prevention) recommending walking at least 10,000 steps per day, if a user hasn’t got a healthy amount of exercise in by 7PM, a reminder should be sent out encouraging them to either continue their trend of working out in the early evening or not miss out on the recommended calorie burn for the day. 
+Another option would be to have an alarm reminding users to get extra steps in after an extended period of sedentary activity. This can help encourage users to get more exercise outside of the typical peak hours.
+
+How can these insights drive business decisions?
+
+Targeted marketing can be used to interact with users at peak times where users will most likely be interacting with their device. Partnering with a snack based company could prove fruitful based on many customers getting their most productive amounts of exercise right before or after meal times. 
+
+
+
+
+
+
+
